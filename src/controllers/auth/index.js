@@ -10,7 +10,7 @@ const router = express.Router();
 const user = new UserModel();
 
 const signUpSchema = Joi.object({
-  fullname: Joi.string().email().required(),
+  fullname: Joi.string().required(),
   email: Joi.string().email().required(),
   password: Joi.string()
     .min(8)
