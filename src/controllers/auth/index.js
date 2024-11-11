@@ -34,7 +34,7 @@ class AuthController extends BaseController {
     super(model);
     router.post("/signin", this.validation(signInSchema), this.signIn);
     router.post("/signup", this.validation(signUpSchema), this.signUp);
-    router.get("/whoami", authorize, this.whoAmI)
+    router.get("/whoami", authorize, this.whoAmI);
   }
 
   signIn = async (req, res, next) => {
