@@ -5,17 +5,22 @@ class OrderModel extends BaseModel {
   constructor() {
     super("order");
     this.select = {
-        id: true,
-        order_no: true,
-        users:{
-          fullname: true
+      id: true,
+      order_no: true,
+      overdue_time: true,
+      users: {
+        select: {
+          fullname: true,
         },
-        cars:{
-          name: true
+      },
+      cars: {
+        select: {
+          name: true,
         },
-        status: true
+      },
+      status: true,
     };
   }
 }
 
-module.exports = OrderModel
+module.exports = OrderModel;

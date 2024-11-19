@@ -1,7 +1,5 @@
 const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient({
-  log: ['query']
-});
+const prisma = new PrismaClient()
 
 // abstract class
 class BaseModel {
@@ -34,8 +32,8 @@ class BaseModel {
     };
   };
 
-  getById = async (id, select) => {
-    return this.model.findUnique({ where: { id: Number(id) }, select });
+  getById = async (id, option) => {
+    return this.model.findUnique({ where: { id: Number(id) }, ...option });
   };
 
   getOne = async (query) => {

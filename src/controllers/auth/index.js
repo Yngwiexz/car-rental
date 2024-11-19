@@ -5,6 +5,7 @@ const BaseController = require("../base");
 const UserModel = require("../../models/user");
 const { checkPassword, encryptPassword } = require("../../helpers/bcrypt");
 const { createToken } = require("../../helpers/jwt");
+const { authorize } = require("../../middlewares/authorization");
 const router = express.Router();
 
 const user = new UserModel();
@@ -34,7 +35,7 @@ class AuthController extends BaseController {
     super(model);
     router.post("/signin", this.validation(signInSchema), this.signIn);
     router.post("/signup", this.validation(signUpSchema), this.signUp);
-    router.get("/whoami", authorize, this.whoAmI);
+    router.get('/whoami', authorize, this.whoAmI);
   }
 
   signIn = async (req, res, next) => {
@@ -75,7 +76,7 @@ class AuthController extends BaseController {
 
   signUp = async (req, res, next) => {
     try {
-      const { email, password } = req.body;
+      const { fullname, email, password } = req.body;
       const user = await this.model.getOne({ where: { email } });
 
       if (user) return next(new ValidationError("Email already exist!"));
@@ -83,6 +84,7 @@ class AuthController extends BaseController {
       const newUser = await this.model.set({
         email,
         password: await encryptPassword(password),
+        fullname,
         roleId: 3,
       });
 
@@ -104,6 +106,19 @@ class AuthController extends BaseController {
       next(new ServerError(e));
     }
   };
+
+  whoAmI = async(req, res, next) => {
+    return res.status(200).json(
+      this.apiSend({
+        code: 200,
+        status: "success",
+        message: "Get user successfully",
+        data: {
+          user: req.user,
+        },
+      })
+    );
+  }
 }
 
 new AuthController(user);

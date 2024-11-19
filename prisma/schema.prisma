@@ -5,7 +5,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model cars {
@@ -41,7 +40,10 @@ model order {
   end_time   DateTime? @db.Timestamp(6)
   total      Float?
   is_driver  Boolean?
-  is_expired Boolean?
+  overdue_time DateTime @default(dbgenerated("NOW() + interval '24 hours'"))
+  payment_method String @default("Cash")
+  receipt String?
+  promo_code String?
   status     String?   @db.VarChar
   createdDt  DateTime? @default(now()) @db.Timestamp(6)
   updatedDt  DateTime? @updatedAt
