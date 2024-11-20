@@ -17,10 +17,11 @@ const orderSchema = Joi.object({
   start_time: Joi.date().required(),
   end_time: Joi.date().required(),
   is_driver: Joi.boolean().required(),
+  promo: Joi.string(),
+  payment_method: Joi.string().required(),
 });
 
-const PROMOS = [
-  {
+const PROMOS = [{
     title: "NEWUSER",
     discount: 25,
     expired_date: "25/11/2024",
@@ -29,8 +30,7 @@ const PROMOS = [
     title: "SEWASUKASUKA",
     discount: 15,
     expired_date: "20/11/2024",
-  },
-];
+  }];
 
 class OrderController extends BaseController {
   constructor(model) {
@@ -38,19 +38,21 @@ class OrderController extends BaseController {
     router.get("/", this.getAll);
     router.post("/", this.validation(orderSchema), authorize, this.create);
     router.get("/:myorder", authorize, this.getMyOrder);
-    router.get("/:id", this.get);
+    router.get("/:id", authorize, this.get);
+    router.put("/:id", authorize, this.updateOrder);
     router.get("/:id/invoice", authorize, this.downloadInvoice);
     router.put("/:id/payment", authorize, this.payment);
+    router.get("/:id/cancel", authorize, this.cancelOrder)
     // router.put("/:id", this.validation(carSchema), authorize, checkRole(['admin']), this.update);
     // router.delete("/:id", this.delete);
   }
 
   getMyOrder = async (req, res, next) => {
     try {
-      const getOrder = await this.model.getAll({
+      const getOrder = await this.model.get({
         where: {
           user_id: req.user.id,
-        },
+        }
       });
       return res.status(200).json(
         this.apiSend({
@@ -81,23 +83,21 @@ class OrderController extends BaseController {
       if (!getCars)
         return next(new ValidationError("Car not found or is not available!"));
 
-      if (getCars.is_driver && !req.body.is_driver) {
+      if (getCars.isDriver && !req.body.is_driver) {
         return next(new ValidationError("Mobil ini wajib menggunakan supir!"));
       }
 
       const startTime = new Date(req.body.start_time);
       const endTime = new Date(req.body.end_time);
-      const total =
+      let total =
         getCars.price * ((endTime - startTime) / 1000 / 60 / 60 / 24);
 
       if (req.body.promo) {
-        if (!PROMOS.includes(req.body.promo))
-          return next(
-            new ValidationError("Promo not found or is not availabele")
-          );
+        const selectedPromo = PROMOS.find((promo) => promo.title === req.body.promo);
+        if(!selectedPromo || selectedPromo.expired_date < new Date())
+          return next(new ValidationError("Promo not found is not available"))
 
-        const selectedPromo = PROMOS.find(req.body.promo);
-        total = price * ((100 - selectedPromo) / 100);
+        total = price * ((100 - selectedPromo.discount) / 100);
       }
 
       const [result, carUpdate] = await this.model.transaction([
@@ -109,6 +109,8 @@ class OrderController extends BaseController {
           is_expired: false,
           createdBy: req.user.fullname,
           updatedBy: req.user.fullname,
+          payment_method: req.body.payment_method,
+          promo_code: req.body.promo,
           total,
           cars: {
             connect: {
@@ -137,43 +139,6 @@ class OrderController extends BaseController {
     }
   };
 
-  payment = async (req, res, next) => {
-    const { id } = req.params;
-    try {
-      const { receipt } = req.body;
-
-      const getLastOrderToday = await this.model.count({
-        where: {
-          createdDt: {
-            lte: new Date(),
-          },
-        },
-      });
-
-      const currentDate = new Date();
-      const invNumber = `INV/${currentDate.getFullYear()}/${
-        currentDate.getMonth() + 1
-      }/${currentDate.getDate()}/${getLastOrderToday}`;
-
-      const orderPaid = await this.model.update(id, {
-        order_no: invNumber,
-        receipt,
-        status: "paid",
-      });
-
-      return res.status(200).json(
-        this.apiSend({
-          code: 200,
-          status: "success",
-          message: "Order Paid successfully",
-          data: orderPaid,
-        })
-      );
-    } catch (error) {
-      return next(error);
-    }
-  };
-
   updateOrder = async (req, res, next) => {
     try {
       const getCars = await cars.getOne({
@@ -181,12 +146,12 @@ class OrderController extends BaseController {
           id: req.body.car_id,
         },
         select: {
-          is_driver: true,
+          isDriver: true,
           price: true,
         },
       });
 
-      if (getCars.is_driver && !req.body.is_driver) {
+      if (getCars.isDriver && !req.body.is_driver) {
         return next(new ValidationError("Mobil ini wajib menggunakan supir!"));
       }
 
@@ -205,7 +170,7 @@ class OrderController extends BaseController {
         total = price * ((100 - selectedPromo) / 100);
       }
 
-      this.model.update({
+      const result = await this.model.update({
         start_time: startTime,
         end_time: endTime,
         is_driver: req.body.is_driver,
@@ -227,12 +192,48 @@ class OrderController extends BaseController {
     }
   };
 
-  orderCanceled = async (req, res, next) => {
+  payment = async (req, res, next) => {
+    const { id } = req.params;
+    try {
+      const { receipt } = req.body;
+
+      const getLastOrderToday = await this.model.count({
+        where: {
+          createdDt: {
+            lte: new Date(),
+          },
+        },
+      });
+
+      const currentDate = new Date();
+      const invNumber = `INV/${currentDate.getFullYear()}/${currentDate.getMonth() + 1
+        }/${currentDate.getDate()}/${getLastOrderToday}`;
+
+      const orderPaid = await this.model.update(id, {
+        order_no: invNumber,
+        receipt,
+        status: "paid",
+      });
+
+      return res.status(200).json(
+        this.apiSend({
+          code: 200,
+          status: "success",
+          message: "Order Paid successfully",
+          data: orderPaid,
+        })
+      );
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  cancelOrder = async (req, res, next) => {
     try {
       const order = await this.model.getById(req.params.id);
 
-      if (!order)
-        return next(new ValidationError("Order nit found or is not available"));
+      if (!order || order.user_id !== req.user.id) // WIP: tambahkan kondisi superadmin & admin bisa cancel order 
+        return next(new ValidationError("Order not found or is not available"));
 
       const getCars = await cars.getById(order.car_id);
 
