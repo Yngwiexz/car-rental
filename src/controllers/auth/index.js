@@ -11,7 +11,6 @@ const router = express.Router();
 const user = new UserModel();
 
 const signUpSchema = Joi.object({
-  fullname: Joi.string().required(),
   email: Joi.string().email().required(),
   password: Joi.string()
     .min(8)
@@ -23,6 +22,7 @@ const signUpSchema = Joi.object({
       "string.pattern.base": `Password must have at least 1 uppercase, 
         1 lowercase, 1 number, and 1 special character (i.e. !@#$%^&*)`,
     }),
+    fullname: Joi.string(),
 });
 
 const signInSchema = Joi.object({
@@ -35,10 +35,7 @@ class AuthController extends BaseController {
     super(model);
     router.post("/signin", this.validation(signInSchema), this.signIn);
     router.post("/signup", this.validation(signUpSchema), this.signUp);
-<<<<<<< HEAD
     router.get('/whoami', authorize, this.whoAmI);
-=======
->>>>>>> 5eb4fe4a493e169fad3af14c53b3d8b50681b12d
   }
 
   signIn = async (req, res, next) => {
